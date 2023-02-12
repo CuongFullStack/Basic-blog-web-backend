@@ -2,10 +2,14 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const user = require("./models/User");
+const post = require("./models/Post");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 require("dotenv").config();
+const multer = require("multer");
+const uploadMiddleware = multer({ dest: "uploads/" });
+const fs = require("fs");
 
 const app = express();
 
@@ -17,7 +21,16 @@ app.use(express.json());
 app.use(cookieParser()); //////
 
 mongoose.set("strictQuery", false);
-mongoose.connect(process.env.URL);
+
+///connect DB
+(async () => {
+  try {
+    await mongoose.connect(process.env.URL);
+    app.listen(4000);
+  } catch (error) {
+    console.log(">>> Error connect to DB: ", error);
+  }
+})();
 
 app.post("/register", async (req, res) => {
   const { username, password } = req.body;
@@ -63,4 +76,34 @@ app.post("/logout", (req, res) => {
   res.cookie("token", "").json("ok");
 });
 
-app.listen(4000);
+app.post("/post", uploadMiddleware.single("file"), async (req, res) => {
+  console.log(req.file);
+  const { originalname, path } = req.file;
+  const parts = originalname.split(".");
+  const ext = parts[parts.length - 1];
+  const newPath = path + "." + ext;
+  fs.renameSync(path, newPath);
+
+  const { token } = req.cookies;
+  jwt.verify(token, secret, {}, async (err, info) => {
+    if (err) throw err;
+    const { title, summary, content } = req.body;
+    const postDoc = await post.create({
+      title,
+      summary,
+      content,
+      cover: newPath,
+      author: info.id,
+    });
+    res.json(postDoc);
+  });
+});
+
+app.get("/post", async (req, res) => {
+  const posts = await post
+    .find()
+    .populate("author", ["username"])
+    .sort({ createdAt: -1 })
+    .limit(20);
+  res.json(posts);
+});
