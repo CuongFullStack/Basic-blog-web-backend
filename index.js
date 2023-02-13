@@ -19,9 +19,9 @@ const secret = "adadffddgfdgdgffsdfdsfdsfdsds";
 app.use(cors({ credentials: true, origin: "http://localhost:3000" })); ///////
 app.use(express.json());
 app.use(cookieParser()); //////
+app.use("/uploads", express.static(__dirname + "/uploads")); ///Tạo endpoint cho hình ảnh
 
 mongoose.set("strictQuery", false);
-
 ///connect DB
 (async () => {
   try {
@@ -103,7 +103,13 @@ app.get("/post", async (req, res) => {
   const posts = await post
     .find()
     .populate("author", ["username"])
-    .sort({ createdAt: -1 })
+    .sort({ createdAt: -1 }) ///Thứ tự bài đăng
     .limit(20);
   res.json(posts);
+});
+
+app.get("/post/:id", async (req, res) => {
+  const { id } = req.params;
+  const postDoc = await post.findById(id).populate("author", ["username"]);
+  res.json(postDoc);
 });
